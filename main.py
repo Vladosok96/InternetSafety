@@ -1,9 +1,18 @@
 import PySimpleGUI as sg
-from random import choice
+from random import randint
 import math
+from Crypto.Cipher import DES
 
 
-layout = [[sg.Text('Длина последовательности:'), sg.Slider(orientation='h', range=(1000, 100000), resolution=1000, default_value=1000)],
+def find_coprime(n):
+    coprime = randint(1, n)  # Можете начать с 2 или любого другого числа
+    while math.gcd(n, coprime) != 1:
+        coprime += 1
+    return coprime
+
+
+layout = [[sg.Drop(('Квадратичный конгруэнтный генератор', 'Генератор BBS', 'Yarrow-160'), key='-generator_type-')],
+          [sg.Text('Длина последовательности:'), sg.Slider(orientation='h', range=(1000, 100000), resolution=1000, default_value=1000)],
           [sg.Text('Последовательность: ', key='-sequence-')],
           [sg.Button('Генерация')],
           [sg.Text('Открыть файл:'), sg.FileBrowse()],
@@ -23,6 +32,7 @@ layout = [[sg.Text('Длина последовательности:'), sg.Slide
           [sg.Text('Суммы последовательностей: ', key='-sums-')],
           [sg.Text('Количество нулей: ', key='-L-')],
           [sg.Text('Статистики: ', key='-deviation_statistics-')],
+          [sg.Text('Максимальное: ', key='-maximum_statistics-')],
           [sg.Button('Запуск', key="-begin_deviation-")],
          ]
 
@@ -38,7 +48,7 @@ if __name__ == '__main__':
     # Общие переменные
     bits_sequence = ''
 
-    window = sg.Window('Тестирование псевдослучайных последовательностей', layout, size=(600, 600))
+    window = sg.Window('Тестирование псевдослучайных последовательностей', layout, size=(600, 640))
 
     while True:
         event, values = window.read()
@@ -48,9 +58,48 @@ if __name__ == '__main__':
 
         # Генерация последовательности нулей и единиц
         if event == 'Генерация':
+            print(values)
             bits_sequence = ''
-            for i in range(int(values[0])):
-                bits_sequence += choice(['0', '1'])
+
+            if values['-generator_type-'] == 'Квадратичный конгруэнтный генератор':
+                N = 65535
+                d = 16311
+                a = 11233
+                c = 65537
+                x1 = randint(1, N)
+                x2 = 0
+
+                while len(bits_sequence) < values[0]:
+                    x2 = (d * (x1 ** 2) + (a * x1) + c) % N
+                    x1 = x2
+                    bits_sequence += bin(x1)[2:]
+            if values['-generator_type-'] == 'Генератор BBS':
+                p = 0
+                q = 1
+                while p % 4 != q % 4 or q % 4 != 3 % 4:
+                    p = randint(0, 2**160)
+                    q = randint(0, 2**160)
+                N = p * q
+                s = find_coprime(N)
+                u0 = s**2 % N
+                for _ in range(int(values[0])):
+                    u1 = u0**2 % N
+                    u0 = u1
+                    bits_sequence += bin(u0)[-1]
+            if values['-generator_type-'] == 'Yarrow-160':
+                n = 64
+                k = 64
+                Pg = 10
+                Pt = 20
+                t = 0
+                C0 = 350
+                curPg = Pg
+                curPt = Pt
+
+                if curPg == 0:
+                    des = DES.new()
+
+
             short_sequence = bits_sequence[:10] + '...' + bits_sequence[-10:]
             window['-sequence-'].update(f'Последовательность: {short_sequence}')
 
@@ -130,15 +179,18 @@ if __name__ == '__main__':
 
             result = ''
             counter = -9
+            max_statistics = 0
             for i in range(3):
                 for j in range(6):
                     if counter != 0:
                         Yj = abs(states[counter] - L)
                         Yj /= pow(2 * L * (4 * abs(counter) - 2), 0.5)
                         result += f'{counter}= {Yj:.2f}, '
+                        max_statistics = max(Yj, max_statistics)
                     counter += 1
                 if i < 2:
                     result += '\n'
             window['-deviation_statistics-'].update(f'Статистики: {result}')
+            window['-maximum_statistics-'].update(f'Максимальное: {max_statistics}')
 
 
