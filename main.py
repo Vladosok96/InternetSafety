@@ -2,6 +2,8 @@ import PySimpleGUI as sg
 from random import randint
 import math
 from Crypto.Cipher import DES
+from Crypto.Random import get_random_bytes
+import hashlib
 
 
 def find_coprime(n):
@@ -12,7 +14,7 @@ def find_coprime(n):
 
 
 layout = [[sg.Drop(('Квадратичный конгруэнтный генератор', 'Генератор BBS', 'Yarrow-160'), key='-generator_type-')],
-          [sg.Text('Длина последовательности:'), sg.Slider(orientation='h', range=(1000, 100000), resolution=1000, default_value=1000)],
+          [sg.Text('Длина последовательности:'), sg.Slider(orientation='h', range=(1000, 10000), resolution=1000, default_value=1000)],
           [sg.Text('Последовательность: ', key='-sequence-')],
           [sg.Button('Генерация')],
           [sg.Text('Открыть файл:'), sg.FileBrowse()],
@@ -89,16 +91,68 @@ if __name__ == '__main__':
             if values['-generator_type-'] == 'Yarrow-160':
                 n = 64
                 k = 64
+                K = get_random_bytes(k // 8)
                 Pg = 10
                 Pt = 20
                 t = 0
-                C0 = 350
+                curC = 350
                 curPg = Pg
                 curPt = Pt
 
-                if curPg == 0:
-                    des = DES.new()
+                while len(bits_sequence) < int(values[0]):
+                    if curPg == 0:
+                        t += 1
 
+                        # G(i)
+                        curC = (curC + 1) % (2 ** n)
+                        plaintext = curC.to_bytes(n // 8, byteorder='big')
+
+                        cipher = DES.new(K, DES.MODE_ECB)
+                        K = cipher.encrypt(plaintext)
+
+                        curPg = Pg
+                    if curPt == 0:
+                        v = int.from_bytes(get_random_bytes(k // 8), byteorder='big')
+                        v0 = hashlib.sha1((v | t).to_bytes(n // 8, byteorder='big')).digest()
+                        vi = v0
+                        for i in range(t):
+                            vi = (int.from_bytes(vi, byteorder='big') | int.from_bytes(v0, byteorder='big') | i) % (2 ** 64)
+                            vi = hashlib.sha1(vi.to_bytes(n // 8, byteorder='big')).digest()
+
+                        # H(s, k)
+                        s0 = (int.from_bytes(vi, byteorder='big') | int.from_bytes(K, byteorder='big')) % (2 ** 64)
+                        s0 = hashlib.sha1(s0.to_bytes(n // 8, byteorder='big')).digest()
+                        s = [int.from_bytes(s0, byteorder='big')]
+                        for i in range(t):
+                            s.append(s[0])
+                            for j in range(len(s) - 1):
+                                s[-1] |= s[j]
+                            s[-1] %= (2 ** 64)
+                            s[-1] = hashlib.sha1(s[-1].to_bytes(n // 8, byteorder='big')).digest()
+                            s[-1] = int.from_bytes(s[-1], byteorder='big')
+                        tmpK = s[0]
+                        for i in range(1, len(s)):
+                            tmpK |= s[i]
+                        K = int(bin(tmpK)[2:k+2], 2).to_bytes(n // 8, byteorder='big')
+
+                        plaintext = (0).to_bytes(n // 8, byteorder='big')
+                        cipher = DES.new(K, DES.MODE_ECB)
+                        curC = int.from_bytes(cipher.encrypt(plaintext), byteorder='big')
+
+                        curPt = Pt
+                        curPg = Pg
+                        t += 1
+
+                    # G(i)
+                    t += 1
+                    curC = (curC + 1) % (2 ** n)
+                    plaintext = curC.to_bytes(n // 8, byteorder='big')
+
+                    cipher = DES.new(K, DES.MODE_ECB)
+                    bits_sequence += bin(int.from_bytes(cipher.encrypt(plaintext), byteorder='big'))[2:]
+
+                    curPg -= 1
+                    curPt -= 1
 
             short_sequence = bits_sequence[:10] + '...' + bits_sequence[-10:]
             window['-sequence-'].update(f'Последовательность: {short_sequence}')
