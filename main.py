@@ -13,29 +13,93 @@ def find_coprime(n):
     return coprime
 
 
-layout = [[sg.Drop(('Квадратичный конгруэнтный генератор', 'Генератор BBS', 'Yarrow-160'), key='-generator_type-')],
-          [sg.Text('Длина последовательности:'), sg.Slider(orientation='h', range=(1000, 10000), resolution=1000, default_value=1000)],
-          [sg.Text('Последовательность: ', key='-sequence-')],
-          [sg.Button('Генерация')],
-          [sg.Text('Открыть файл:'), sg.FileBrowse()],
-          [sg.Button('Запись'), sg.Button('Чтение')],
+# Генератор BBS
+def bbs_generator(length):
+    bits_sequence = ''
+    p = 0
+    q = 1
+    while p % 4 != q % 4 or q % 4 != 3 % 4:
+        p = randint(0, 2 ** 160)
+        q = randint(0, 2 ** 160)
+    N = p * q
+    s = find_coprime(N)
+    u0 = s ** 2 % N
+    for _ in range(length):
+        u1 = u0 ** 2 % N
+        u0 = u1
+        bits_sequence += bin(u0)[-1]
+
+    return bits_sequence
+
+
+def f(Ai, Xi):
+    # Сложение по модулю 2^32
+    result = (Ai + Xi) % (2 ** 32)
+
+    # Разбиение на восемь 4-битовых подпоследовательностей
+    sub_sequences = [(result >> i) & 0xF for i in range(0, 32, 4)]
+
+    # S-блоки
+    s_box = [1, 15, 13, 0, 5, 7, 10, 4, 9, 2, 3, 14, 6, 11, 8, 12]
+
+    # Применение S-блоков к каждой подпоследовательности
+    s_box_results = [s_box[sub_sequence] for sub_sequence in sub_sequences]
+
+    # Объединение результатов S-блоков в 32-битное слово
+    combined_result = sum((s_box_result << i) for i, s_box_result in enumerate(s_box_results))
+
+    # Циклический сдвиг влево на 11 битов
+    final_result = ((combined_result << 11) | (combined_result >> (32 - 11))) % (2 ** 32)
+
+    return final_result
+
+
+def Ek(A, Key):
+    A0 = A & 0xFFFFFFFF
+    B0 = (A >> 32) & 0xFFFFFFFF
+
+    # Разделение 256-битного числа на 8 32-битных чисел
+    K = [((Key >> i) & 0xFFFFFFFF) for i in range(0, 256, 32)]
+
+    # Создание нового списка из 32-битных чисел
+    X = []
+
+    # Добавление первых 24 чисел (циклическое повторение чисел K)
+    for _ in range(3):
+        X.extend(K)
+
+    # Добавление оставшихся 8 чисел (числа K в обратном порядке)
+    X.extend(reversed(K))
+
+    for Xi in range(32):
+        A0 = B0 ^ f(A0, Xi)
+        B0 = A0
+
+    return (B0 << 32) | A0
+
+
+# layout = [[sg.Text('Шифрование', font=("Helvetica", 14))],
+#           [sg.Text('Сообщение:'), sg.Input()],
+#           [sg.Button('Зашифровать')],
+#           [sg.Text('Результат: ', key='-encryption-')],
+#           [sg.Text('Открыть файл:'), sg.FileBrowse()],
+#           [sg.Button('Запись'), sg.Button('Чтение')],
+#           [sg.HorizontalSeparator()],
+#           [sg.Text('Дешифрование', font=("Helvetica", 14))],
+#           [sg.Text('Сообщение:'), sg.Input()],
+#           [sg.Button('Дешифровать')],
+#           [sg.Text('Результат: ', key='-encryption-')],
+#          ]
+
+layout = [[sg.Text('Шифрование', font=("Helvetica", 14))],
+          [sg.Text('Сообщение:'), sg.Input()],
+          [sg.Button('Зашифровать')],
+          [sg.Text('Результат: ', key='-encryption-')],
           [sg.HorizontalSeparator()],
-          [sg.Text('Частотный тест')],
-          [sg.Text('Результат: ', key='-frequency-')],
-          [sg.Button('Запуск', key="-begin_frequency-")],
-          [sg.HorizontalSeparator()],
-          [sg.Text('Последовательность одинаковых бит')],
-          [sg.Text('Частота единиц: ', key='-ones_frequency-')],
-          [sg.Text('Vn: ', key='-Vn-')],
-          [sg.Text('Статистика: ', key='-statistics-')],
-          [sg.Button('Запуск', key="-begin_same_bits-")],
-          [sg.HorizontalSeparator()],
-          [sg.Text('Тест на произвольные отклонения')],
-          [sg.Text('Суммы последовательностей: ', key='-sums-')],
-          [sg.Text('Количество нулей: ', key='-L-')],
-          [sg.Text('Статистики: ', key='-deviation_statistics-')],
-          [sg.Text('Максимальное: ', key='-maximum_statistics-')],
-          [sg.Button('Запуск', key="-begin_deviation-")],
+          [sg.Text('Дешифрование', font=("Helvetica", 14))],
+          [sg.Text('Сообщение:'), sg.Input()],
+          [sg.Button('Дешифровать')],
+          [sg.Text('Результат: ', key='-encryption-')],
          ]
 
 
@@ -47,10 +111,7 @@ def r(k, arr):
 
 if __name__ == '__main__':
 
-    # Общие переменные
-    bits_sequence = ''
-
-    window = sg.Window('Тестирование псевдослучайных последовательностей', layout, size=(600, 640))
+    window = sg.Window('Тестирование псевдослучайных последовательностей', layout)
 
     while True:
         event, values = window.read()
@@ -58,104 +119,38 @@ if __name__ == '__main__':
             runGame = False
             break
 
-        # Генерация последовательности нулей и единиц
-        if event == 'Генерация':
-            print(values)
-            bits_sequence = ''
+        # Запуск алгоритма шифрования
+        if event == 'Зашифровать':
+            input_message = values[0]
 
-            if values['-generator_type-'] == 'Квадратичный конгруэнтный генератор':
-                N = 65535
-                d = 16311
-                a = 11233
-                c = 65537
-                x1 = randint(1, N)
-                x2 = 0
+            M = []
+            for n in range(math.ceil(len(input_message) / 32)):
+                mn = bytes(input_message[n*32:(n+1)*32], 'utf-8')
+                if len(mn) < 32:
+                    mn += b'\x00' * (32 - len(mn))
+                print(int.from_bytes(mn, byteorder='big'), len(mn) * 8)
+                M.append(int.from_bytes(mn, byteorder='big'))
 
-                while len(bits_sequence) < values[0]:
-                    x2 = (d * (x1 ** 2) + (a * x1) + c) % N
-                    x1 = x2
-                    bits_sequence += bin(x1)[2:]
-            if values['-generator_type-'] == 'Генератор BBS':
-                p = 0
-                q = 1
-                while p % 4 != q % 4 or q % 4 != 3 % 4:
-                    p = randint(0, 2**160)
-                    q = randint(0, 2**160)
-                N = p * q
-                s = find_coprime(N)
-                u0 = s**2 % N
-                for _ in range(int(values[0])):
-                    u1 = u0**2 % N
-                    u0 = u1
-                    bits_sequence += bin(u0)[-1]
-            if values['-generator_type-'] == 'Yarrow-160':
-                n = 64
-                k = 64
-                K = get_random_bytes(k // 8)
-                Pg = 10
-                Pt = 20
-                t = 0
-                curC = 350
-                curPg = Pg
-                curPt = Pt
+            h = bbs_generator(256)
+            SUM = 0
+            L = 0
 
-                while len(bits_sequence) < int(values[0]):
-                    if curPg == 0:
-                        t += 1
+            for i in range(len(M)):
+                h = f(h, M[i])
+                L += 256
+                SUM += M[i]
 
-                        # G(i)
-                        curC = (curC + 1) % (2 ** n)
-                        plaintext = curC.to_bytes(n // 8, byteorder='big')
+            L += 256
+            Mn = 0
+            SUM += Mn
+            h = f(h, Mn)
+            h = f(h, L)
+            H = f(h, SUM)
 
-                        cipher = DES.new(K, DES.MODE_ECB)
-                        K = cipher.encrypt(plaintext)
 
-                        curPg = Pg
-                    if curPt == 0:
-                        v = int.from_bytes(get_random_bytes(k // 8), byteorder='big')
-                        v0 = hashlib.sha1((v | t).to_bytes(n // 8, byteorder='big')).digest()
-                        vi = v0
-                        for i in range(t):
-                            vi = (int.from_bytes(vi, byteorder='big') | int.from_bytes(v0, byteorder='big') | i) % (2 ** 64)
-                            vi = hashlib.sha1(vi.to_bytes(n // 8, byteorder='big')).digest()
-
-                        # H(s, k)
-                        s0 = (int.from_bytes(vi, byteorder='big') | int.from_bytes(K, byteorder='big')) % (2 ** 64)
-                        s0 = hashlib.sha1(s0.to_bytes(n // 8, byteorder='big')).digest()
-                        s = [int.from_bytes(s0, byteorder='big')]
-                        for i in range(t):
-                            s.append(s[0])
-                            for j in range(len(s) - 1):
-                                s[-1] |= s[j]
-                            s[-1] %= (2 ** 64)
-                            s[-1] = hashlib.sha1(s[-1].to_bytes(n // 8, byteorder='big')).digest()
-                            s[-1] = int.from_bytes(s[-1], byteorder='big')
-                        tmpK = s[0]
-                        for i in range(1, len(s)):
-                            tmpK |= s[i]
-                        K = int(bin(tmpK)[2:k+2], 2).to_bytes(n // 8, byteorder='big')
-
-                        plaintext = (0).to_bytes(n // 8, byteorder='big')
-                        cipher = DES.new(K, DES.MODE_ECB)
-                        curC = int.from_bytes(cipher.encrypt(plaintext), byteorder='big')
-
-                        curPt = Pt
-                        curPg = Pg
-                        t += 1
-
-                    # G(i)
-                    t += 1
-                    curC = (curC + 1) % (2 ** n)
-                    plaintext = curC.to_bytes(n // 8, byteorder='big')
-
-                    cipher = DES.new(K, DES.MODE_ECB)
-                    bits_sequence += bin(int.from_bytes(cipher.encrypt(plaintext), byteorder='big'))[2:]
-
-                    curPg -= 1
-                    curPt -= 1
-
-            short_sequence = bits_sequence[:10] + '...' + bits_sequence[-10:]
-            window['-sequence-'].update(f'Последовательность: {short_sequence}')
+        # Запуск алгоритма дешифрования
+        if event == 'Дешифровать':
+            pass
 
         # Запись сгенерированной последовательности в файл
         if event == 'Запись':
