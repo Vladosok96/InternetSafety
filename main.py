@@ -3,7 +3,7 @@ import math
 
 
 # Генератор BBS
-def bbs_generator(length):
+def square_generator(length):
     bits_sequence = ''
     N = 65535
     d = 16311
@@ -17,7 +17,6 @@ def bbs_generator(length):
         x1 = x2
         bits_sequence += bin(x1)[2:]
 
-    print(len(bits_sequence[:length]), bits_sequence[:length])
     return bits_sequence[:length]
 
 
@@ -67,8 +66,10 @@ def Ek(A, Key):
 
     return (B0 << 32) | A0
 
+
 layout = [[sg.Text('Шифрование', font=("Helvetica", 14))],
           [sg.Text('Сообщение:'), sg.Input()],
+          [sg.Text('Пароль:'), sg.Input()],
           [sg.Button('Зашифровать')],
           [sg.Text('Результат: ', key='-encryption-')],
           [sg.HorizontalSeparator()],
@@ -97,34 +98,37 @@ if __name__ == '__main__':
 
         # Запуск алгоритма шифрования
         if event == 'Зашифровать':
-            input_message = values[0]
+            password = values[1]
 
             M = []
-            for n in range(math.ceil(len(input_message) / 32)):
-                mn = bytes(input_message[n*32:(n+1)*32], 'utf-8')
+            for n in range(math.ceil(len(password) / 32)):
+                mn = bytes(password[n*32:(n+1)*32], 'utf-8')
                 if len(mn) < 32:
                     mn += b'\x00' * (32 - len(mn))
                 print(int.from_bytes(mn, byteorder='big'), len(mn) * 8, mn)
                 M.append(int.from_bytes(mn, byteorder='big'))
 
-            h = int(bbs_generator(256), 2)
+            h = int(square_generator(256), 2)
             SUM = 0
             L = 0
 
             for i in range(len(M)):
-                h = f(h, M[i])
+                h = Ek(h, M[i])
                 L += 256
                 SUM += M[i]
 
             L += 256
             Mn = 0
             SUM += Mn
+
+            output = h.to_bytes(32, 'big')
+            print(h, len(output), output)
+
             h = f(h, Mn)
             h = f(h, L)
             h = f(h, SUM)
 
-            output = h.to_bytes(256, 'big')
-
+            output = h.to_bytes(32, 'big')
             print(h, len(output), output)
 
         # Запуск алгоритма дешифрования
