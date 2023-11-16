@@ -20,7 +20,6 @@ def square_generator(length):
     return bits_sequence[:length]
 
 
-# Шифрующее преобразование ГОСТ 28147-89 в режиме простой замены
 def f(Ai, Xi):
     # Сложение по модулю 2^32
     result = (Ai + Xi) % (2 ** 32)
@@ -43,40 +42,60 @@ def f(Ai, Xi):
     return final_result
 
 
-def Ek(A, Key):
-    A0 = A & 0xFFFFFFFF
-    B0 = (A >> 32) & 0xFFFFFFFF
+# Шифрующее преобразование ГОСТ 28147-89 в режиме простой замены
+def Ek(M_value, Key_value):
 
-    # Разделение 256-битного числа на 8 32-битных чисел
-    K = [((Key >> i) & 0xFFFFFFFF) for i in range(0, 256, 32)]
+    h = 0
+    for j in range(4):
+        Si = (M_value >> (j * 64)) & 0xFFFFFFFF
+        h = h << 64
 
-    # Создание нового списка из 32-битных чисел
-    X = []
+        A0 = Si & 0xFFFF
+        B0 = (Si >> 32) & 0xFFFF
 
-    # Добавление первых 24 чисел (циклическое повторение чисел K)
-    for _ in range(3):
-        X.extend(K)
+        # Разделение 256-битного числа на 8 32-битных чисел
+        K = []
+        for i in range(0, 256, 32):
+            K.append(((Key_value >> i) & 0xFFFF))
 
-    # Добавление оставшихся 8 чисел (числа K в обратном порядке)
-    X.extend(reversed(K))
+        # Создание нового списка из 32-битных чисел
+        X = []
 
-    for Xi in range(32):
-        A0 = B0 ^ f(A0, Xi)
-        B0 = A0
+        # Добавление первых 24 чисел (циклическое повторение чисел K)
+        for _ in range(3):
+            X.extend(K)
 
-    return (B0 << 32) | A0
+        # Добавление оставшихся 8 чисел (числа K в обратном порядке)
+        X.extend(reversed(K))
+
+        A = [A0]
+        B = [B0]
+
+        for Xi in range(32):
+            A.append(B[-1] ^ f(A[-1], X[Xi]))
+            B.append(A[-2])
+
+        A = A[1:]
+        B = B[1:]
+
+        h += (B[-1] << 32) | A[-1]
+
+    h %= 2 ** 256
+
+    return h
 
 
 layout = [[sg.Text('Шифрование', font=("Helvetica", 14))],
           [sg.Text('Сообщение:'), sg.Input()],
           [sg.Text('Пароль:'), sg.Input()],
           [sg.Button('Зашифровать')],
-          [sg.Text('Результат: ', key='-encryption-')],
+          [sg.Text('Результат: '), sg.Input(disabled=True, key='-encryption-')],
           [sg.HorizontalSeparator()],
           [sg.Text('Дешифрование', font=("Helvetica", 14))],
           [sg.Text('Сообщение:'), sg.Input()],
+          [sg.Text('Пароль:'), sg.Input()],
           [sg.Button('Дешифровать')],
-          [sg.Text('Результат: ', key='-encryption-')],
+          [sg.Text('Результат: '), sg.Input(disabled=True, key='-decryption-')],
          ]
 
 
@@ -98,42 +117,115 @@ if __name__ == '__main__':
 
         # Запуск алгоритма шифрования
         if event == 'Зашифровать':
+            message = values[0]
             password = values[1]
+            print(message)
+
+            message_pieces = []
+            for n in range(math.ceil(len(message) / 32)):
+                mn = bytes(message[n*32:(n+1)*32], 'utf-8')
+                if len(mn) < 32:
+                    mn += b'\x00' * (32 - len(mn))
+                # print(int.from_bytes(mn, byteorder='big'), len(mn) * 8, mn)
+                message_pieces.append(int.from_bytes(mn, byteorder='big'))
 
             M = []
             for n in range(math.ceil(len(password) / 32)):
                 mn = bytes(password[n*32:(n+1)*32], 'utf-8')
                 if len(mn) < 32:
                     mn += b'\x00' * (32 - len(mn))
-                print(int.from_bytes(mn, byteorder='big'), len(mn) * 8, mn)
+                # print(int.from_bytes(mn, byteorder='big'), len(mn) * 8, mn)
                 M.append(int.from_bytes(mn, byteorder='big'))
 
-            h = int(square_generator(256), 2)
+            K = int(square_generator(256), 2)
             SUM = 0
             L = 0
 
+            M_hash = []
+
             for i in range(len(M)):
-                h = Ek(h, M[i])
+
+                h = Ek(M[i], K)
+
                 L += 256
                 SUM += M[i]
 
-            L += 256
-            Mn = 0
-            SUM += Mn
+                L += 256
+                Mn = 0
+                SUM += Mn
 
-            output = h.to_bytes(32, 'big')
-            print(h, len(output), output)
+                h = Ek(h, Mn)
+                h = Ek(h, L)
+                h = Ek(h, SUM)
 
-            h = f(h, Mn)
-            h = f(h, L)
-            h = f(h, SUM)
+                M_hash.append(h)
+                K = h
 
-            output = h.to_bytes(32, 'big')
-            print(h, len(output), output)
+            print(M_hash)
+
+            result_message = ''
+            for i in range(len(message_pieces)):
+                message_pieces[i] ^= M_hash[i]
+                result_message += hex(message_pieces[i])[2:]
+
+            window['-encryption-'].update(result_message)
+
+            # output = h.to_bytes(32, 'big')
+            # print(h, len(output), output)
 
         # Запуск алгоритма дешифрования
         if event == 'Дешифровать':
-            pass
+            message = values[3]
+            password = values[4]
+
+            message_pieces = []
+            for n in range(math.ceil(len(message) / 32)):
+                message_pieces.append(int(message[n*32:(n+1)*32], 16))
+
+            M = []
+            for n in range(math.ceil(len(password) / 32)):
+                mn = bytes(password[n * 32:(n + 1) * 32], 'utf-8')
+                if len(mn) < 32:
+                    mn += b'\x00' * (32 - len(mn))
+                # print(int.from_bytes(mn, byteorder='big'), len(mn) * 8, mn)
+                M.append(int.from_bytes(mn, byteorder='big'))
+
+            for i in range(len(message_pieces) - len(M)):
+                M.append(0)
+
+            K = int(square_generator(256), 2)
+            SUM = 0
+            L = 0
+
+            M_hash = []
+
+            for i in range(len(M)):
+                h = Ek(M[i], K)
+
+                L += 256
+                SUM += M[i]
+
+                L += 256
+                Mn = 0
+                SUM += Mn
+
+                h = Ek(h, Mn)
+                h = Ek(h, L)
+                h = Ek(h, SUM)
+
+                M_hash.append(h)
+                K = h
+
+            print(M_hash)
+
+            result_message = ''
+            for i in range(len(message_pieces)):
+                message_pieces[i] ^= M_hash[i]
+                result_message += hex(message_pieces[i])[2:]
+
+            byte_object = bytes.fromhex(result_message)
+
+            window['-decryption-'].update(byte_object.decode('utf-8'))
 
         # Запись сгенерированной последовательности в файл
         if event == 'Запись':
