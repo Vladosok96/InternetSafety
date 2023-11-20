@@ -86,7 +86,7 @@ def Ek(M_value, Key_value):
 
 
 layout = [[sg.Text('Шифрование', font=("Helvetica", 14))],
-          [sg.Text('Сообщение:'), sg.Input()],
+          [sg.Text('Сообщение:'), sg.Multiline(size=(40, 10))],
           [sg.Text('Пароль:'), sg.Input()],
           [sg.Button('Зашифровать')],
           [sg.Text('Результат: '), sg.Input(disabled=True, key='-encryption-')],
@@ -95,7 +95,7 @@ layout = [[sg.Text('Шифрование', font=("Helvetica", 14))],
           [sg.Text('Сообщение:'), sg.Input()],
           [sg.Text('Пароль:'), sg.Input()],
           [sg.Button('Дешифровать')],
-          [sg.Text('Результат: '), sg.Input(disabled=True, key='-decryption-')],
+          [sg.Text('Результат: '), sg.Multiline(size=(40, 10), key='-decryption-')],
          ]
 
 
@@ -115,11 +115,13 @@ if __name__ == '__main__':
             runGame = False
             break
 
+        if event in 'Copy':
+            print(event, values)
+
         # Запуск алгоритма шифрования
         if event == 'Зашифровать':
             message = values[0]
             password = values[1]
-            print(message)
 
             message_pieces = []
             for n in range(math.ceil(len(message) / 32)):
@@ -137,13 +139,16 @@ if __name__ == '__main__':
                 # print(int.from_bytes(mn, byteorder='big'), len(mn) * 8, mn)
                 M.append(int.from_bytes(mn, byteorder='big'))
 
+            for i in range(len(message_pieces) - len(M)):
+                M.append(0)
+
             K = int(square_generator(256), 2)
             SUM = 0
             L = 0
 
             M_hash = []
 
-            for i in range(len(M)):
+            for i in range(len(message_pieces)):
 
                 h = Ek(M[i], K)
 
@@ -161,17 +166,19 @@ if __name__ == '__main__':
                 M_hash.append(h)
                 K = h
 
-            print(M_hash)
-
             result_message = ''
             for i in range(len(message_pieces)):
+
+                print(i, bin(message_pieces[i])[2:].rjust(256, "0"))
+                print(i, bin(M_hash[i])[2:].rjust(256, "0"))
+
                 message_pieces[i] ^= M_hash[i]
+
+                print(i, bin(message_pieces[i])[2:].rjust(256, "0"), '\n')
+
                 result_message += hex(message_pieces[i])[2:]
 
             window['-encryption-'].update(result_message)
-
-            # output = h.to_bytes(32, 'big')
-            # print(h, len(output), output)
 
         # Запуск алгоритма дешифрования
         if event == 'Дешифровать':
@@ -179,8 +186,11 @@ if __name__ == '__main__':
             password = values[4]
 
             message_pieces = []
-            for n in range(math.ceil(len(message) / 32)):
-                message_pieces.append(int(message[n*32:(n+1)*32], 16))
+
+            print("len: ", len(message))
+
+            for n in range(math.ceil(len(message) / 64)):
+                message_pieces.append(int(message[n*64:(n+1)*64], 16))
 
             M = []
             for n in range(math.ceil(len(password) / 32)):
@@ -216,14 +226,21 @@ if __name__ == '__main__':
                 M_hash.append(h)
                 K = h
 
-            print(M_hash)
-
             result_message = ''
             for i in range(len(message_pieces)):
+
+                print(i, bin(message_pieces[i])[2:].rjust(256, "0"))
+                print(i, bin(M_hash[i])[2:].rjust(256, "0"))
+
                 message_pieces[i] ^= M_hash[i]
+
+                print(i, bin(message_pieces[i])[2:].rjust(256, "0"), '\n')
+
                 result_message += hex(message_pieces[i])[2:]
 
+            print(len(result_message))
             byte_object = bytes.fromhex(result_message)
+            print(byte_object)
 
             window['-decryption-'].update(byte_object.decode('utf-8'))
 
