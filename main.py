@@ -3,13 +3,12 @@ import math
 
 
 # Генератор BBS
-def square_generator(length):
+def square_generator(length, x1):
     bits_sequence = ''
     N = 65535
     d = 16311
     a = 11233
     c = 65537
-    x1 = 169
     x2 = 0
 
     while len(bits_sequence) < length:
@@ -47,16 +46,16 @@ def Ek(M_value, Key_value):
 
     h = 0
     for j in range(4):
-        Si = (M_value >> (j * 64)) & 0xFFFFFFFF
+        Si = (M_value >> (j * 64)) & 0xFFFFFFFFFFFFFFFF
         h = h << 64
 
-        A0 = Si & 0xFFFF
-        B0 = (Si >> 32) & 0xFFFF
+        A0 = Si & 0xFFFFFFFF
+        B0 = (Si >> 32) & 0xFFFFFFFF
 
         # Разделение 256-битного числа на 8 32-битных чисел
         K = []
         for i in range(0, 256, 32):
-            K.append(((Key_value >> i) & 0xFFFF))
+            K.append(((Key_value >> i) & 0xFFFFFFFF))
 
         # Создание нового списка из 32-битных чисел
         X = []
@@ -86,7 +85,7 @@ def Ek(M_value, Key_value):
 
 
 layout = [[sg.Text('Шифрование', font=("Helvetica", 14))],
-          [sg.Text('Сообщение:'), sg.Multiline(size=(40, 10))],
+          [sg.Text('Сообщение:'), sg.Multiline(size=(70, 20))],
           [sg.Text('Пароль:'), sg.Input()],
           [sg.Button('Зашифровать')],
           [sg.Text('Результат: '), sg.Input(disabled=True, key='-encryption-')],
@@ -95,7 +94,7 @@ layout = [[sg.Text('Шифрование', font=("Helvetica", 14))],
           [sg.Text('Сообщение:'), sg.Input()],
           [sg.Text('Пароль:'), sg.Input()],
           [sg.Button('Дешифровать')],
-          [sg.Text('Результат: '), sg.Multiline(size=(40, 10), key='-decryption-')],
+          [sg.Text('Результат: '), sg.Multiline(size=(70, 20), key='-decryption-')],
          ]
 
 
@@ -114,9 +113,6 @@ if __name__ == '__main__':
         if event == sg.WIN_CLOSED:
             runGame = False
             break
-
-        if event in 'Copy':
-            print(event, values)
 
         # Запуск алгоритма шифрования
         if event == 'Зашифровать':
@@ -142,7 +138,7 @@ if __name__ == '__main__':
             for i in range(len(message_pieces) - len(M)):
                 M.append(0)
 
-            K = int(square_generator(256), 2)
+            K = int(square_generator(256, M[0] % 2**10), 2)
             SUM = 0
             L = 0
 
@@ -169,12 +165,12 @@ if __name__ == '__main__':
             result_message = ''
             for i in range(len(message_pieces)):
 
-                print(i, bin(message_pieces[i])[2:].rjust(256, "0"))
-                print(i, bin(M_hash[i])[2:].rjust(256, "0"))
+                # print(i, bin(message_pieces[i])[2:].rjust(256, "0"))
+                # print(i, bin(M_hash[i])[2:].rjust(256, "0"))
 
                 message_pieces[i] ^= M_hash[i]
 
-                print(i, bin(message_pieces[i])[2:].rjust(256, "0"), '\n')
+                # print(i, bin(message_pieces[i])[2:].rjust(256, "0"), '\n')
 
                 result_message += hex(message_pieces[i])[2:]
 
@@ -187,7 +183,7 @@ if __name__ == '__main__':
 
             message_pieces = []
 
-            print("len: ", len(message))
+            # print("len: ", len(message))
 
             for n in range(math.ceil(len(message) / 64)):
                 message_pieces.append(int(message[n*64:(n+1)*64], 16))
@@ -203,7 +199,7 @@ if __name__ == '__main__':
             for i in range(len(message_pieces) - len(M)):
                 M.append(0)
 
-            K = int(square_generator(256), 2)
+            K = int(square_generator(256, M[0] % 2**10), 2)
             SUM = 0
             L = 0
 
@@ -229,20 +225,26 @@ if __name__ == '__main__':
             result_message = ''
             for i in range(len(message_pieces)):
 
-                print(i, bin(message_pieces[i])[2:].rjust(256, "0"))
-                print(i, bin(M_hash[i])[2:].rjust(256, "0"))
+                # print(i, bin(message_pieces[i])[2:].rjust(256, "0"))
+                # print(i, bin(M_hash[i])[2:].rjust(256, "0"))
 
                 message_pieces[i] ^= M_hash[i]
 
-                print(i, bin(message_pieces[i])[2:].rjust(256, "0"), '\n')
+                # print(i, bin(message_pieces[i])[2:].rjust(256, "0"), '\n')
 
                 result_message += hex(message_pieces[i])[2:]
 
-            print(len(result_message))
+            # print(len(result_message))
             byte_object = bytes.fromhex(result_message)
-            print(byte_object)
+            # print(byte_object)
 
-            window['-decryption-'].update(byte_object.decode('utf-8'))
+            try:
+                decode_message = byte_object.decode('utf-8')
+            except:
+                decode_message = '#######'
+
+
+            window['-decryption-'].update(decode_message)
 
         # Запись сгенерированной последовательности в файл
         if event == 'Запись':
