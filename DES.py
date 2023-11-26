@@ -13,7 +13,6 @@ def generate_keys(k: int):
         piece_str = bin(piece)[2:].rjust(7, '0')
         if piece_str.count('1') % 2 == 0:
             piece += 1
-        print(bin(piece)[2:].rjust(8, '0'))
         pieces.append(piece)
     k_64 = 0
     for i in range(7, -1, -1):
@@ -36,7 +35,7 @@ def generate_keys(k: int):
     for place in table:
         place -= 1
         g = binoperations.set_bit(g, i, binoperations.read_bit(k_64, place))
-        i += 0
+        i += 1
 
     # Сдвиги ключей
     keys = []

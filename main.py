@@ -17,8 +17,6 @@ if __name__ == '__main__':
     while True:
         event, values = window.read()
 
-        print(event, values)
-
         if event == sg.WIN_CLOSED:
             runGame = False
             break
@@ -46,7 +44,6 @@ if __name__ == '__main__':
             # Чтение пароля перевод в 7-ми байтовое число
             password = bytes(password[:7], 'utf-8')
             int_password = int.from_bytes(password, 'big')
-            print(len(bin(int_password)) - 2, bin(int_password))
 
             # Применение функции шифрования DES на каждый блок в отдельности (ECB)
             for block in file_blocks:
@@ -62,7 +59,6 @@ if __name__ == '__main__':
             f = open(values['-encode_into-'], 'wb')
             f.write(output_array)
             f.close()
-
 
         # Запуск алгоритма дешифрования
         if event == 'Дешифровать':
