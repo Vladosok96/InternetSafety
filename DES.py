@@ -2,8 +2,74 @@ import binoperations
 
 
 # Функция генерации 48-битного ключа из 56-битного
-def generate_key(k: int):
-    return k
+def generate_keys(k: int):
+
+    # Расширение до 64 бит
+    pieces = []
+    for i in range(8):
+        piece = k & 0b1111111
+        k = k >> 7
+        piece = piece << 1
+        piece_str = bin(piece)[2:].rjust(7, '0')
+        if piece_str.count('1') % 2 == 0:
+            piece += 1
+        print(bin(piece)[2:].rjust(8, '0'))
+        pieces.append(piece)
+    k_64 = 0
+    for i in range(7, -1, -1):
+        k_64 = k_64 << 8
+        k_64 += pieces[i]
+
+    # Первоначальная перестановка ключа
+    table = [
+        57, 49, 41, 33, 25, 17, 9,
+        1,  58, 50, 42, 34, 26, 18,
+        10, 2,  59, 51, 43, 35, 27,
+        19, 11, 3,  60, 52, 44, 36,
+        63, 55, 47, 39, 31, 23, 15,
+        7,  62, 54, 46, 38, 30, 22,
+        14, 6,  61, 53, 45, 37, 29,
+        21, 13, 5,  28, 20, 12, 4
+    ]
+    g = 0
+    i = 0
+    for place in table:
+        place -= 1
+        g = binoperations.set_bit(g, i, binoperations.read_bit(k_64, place))
+        i += 0
+
+    # Сдвиги ключей
+    keys = []
+    shifts = [1, 1, 2, 2, 2, 2, 2, 2, 1, 2, 2, 2, 2, 2, 2, 1]
+    c = g >> 28
+    d = g & 0xFFFFFFF
+    for step in shifts:
+        c = binoperations.shift(c, step, 28)
+        d = binoperations.shift(d, step, 28)
+        key = (c << 28) + d
+        keys.append(key)
+
+    # Завершающая перестановка ключей
+    for i in range(16):
+        table = [
+            14,  17,  11,  24,  1,   5,
+            3,   28,  15,  6,   21,  10,
+            23,  19,  12,  4,   26,  8,
+            16,  7,   27,  20,  13,  2,
+            41,  52,  31,  37,  47,  55,
+            30,  40,  51,  45,  33,  48,
+            44,  49,  39,  56,  34,  53,
+            46,  42,  50,  36,  29,  32
+        ]
+        key = 0
+        j = 0
+        for place in table:
+            place -= 1
+            key = binoperations.set_bit(key, j, binoperations.read_bit(keys[i], place))
+            j += 0
+        keys[i] = key
+
+    return keys
 
 
 # Функция Фейстеля
@@ -106,7 +172,7 @@ def f(half: int, key: int):
 def DES(block: int, key: int):
 
     # Генерация 48-битного ключа
-    key = generate_key(key)
+    keys = generate_keys(key)
 
     # Начальная перестановка
     permutations_table = [
@@ -130,10 +196,10 @@ def DES(block: int, key: int):
     # Циклы сетей Фейстеля
     left_half = block >> 32
     right_half = block & 0xFFFFFFFF
-    for _ in range(16):
+    for i in range(16):
         left_half_tmp = left_half
         left_half = right_half
-        right_half = left_half_tmp ^ f(right_half, key)
+        right_half = left_half_tmp ^ f(right_half, keys[i])
     block = (left_half << 32) + right_half
 
     # Конечная перестановка
