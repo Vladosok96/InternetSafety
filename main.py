@@ -1,9 +1,9 @@
 import PySimpleGUI as sg
-import DES
 import struct
+import ElGamal
 
 
-layout = [[sg.Text('Шифрование DES-EEE3', font=("Helvetica", 14))],
+layout = [[sg.Text('Шифрование Эль-Гамаля', font=("Helvetica", 14))],
           [sg.Text('Файл:'), sg.FileBrowse(button_text='Выбрать файл', key='-encode_browse-')],
           [sg.Text('Пароль:'), sg.Input(key='-encode_password-')],
           [sg.SaveAs('Зашифровать в', file_types=(("ALL Files", "*.des"),), change_submits=True, key='-encode_into-')],
@@ -49,16 +49,6 @@ if __name__ == '__main__':
             password = bytes(password[:7], 'utf-8')
             int_password = int.from_bytes(password, 'big')
 
-            # Применение функции шифрования DES на каждый блок в отдельности (ECB)
-            progress = 0
-            for block in file_blocks:
-                encrypted_block = DES.DES(block, int_password, DES.ENCRYPTION)
-                encrypted_block = DES.DES(encrypted_block, int_password, DES.ENCRYPTION)
-                encrypted_block = DES.DES(encrypted_block, int_password, DES.ENCRYPTION)
-                output_file_blocks.append(encrypted_block)
-                progress += 1
-                print(f'processing: {progress}/{len(file_blocks)}')
-
             # Вывод в файл
             f = open(values['-encode_into-'], 'wb')
             for block in output_file_blocks:
@@ -86,20 +76,6 @@ if __name__ == '__main__':
                 int_file_block = struct.unpack('Q', file_block)[0]
                 file_blocks.append(int_file_block)
             f.close()
-
-            # Чтение пароля перевод в 7-ми байтовое число
-            password = bytes(password[:7], 'utf-8')
-            int_password = int.from_bytes(password, 'big')
-
-            # Применение функции дешифрования DES на каждый блок в отдельности (ECB)
-            progress = 0
-            for block in file_blocks:
-                decrypted_block = DES.DES(block, int_password, DES.DECRYPTION)
-                decrypted_block = DES.DES(decrypted_block, int_password, DES.DECRYPTION)
-                decrypted_block = DES.DES(decrypted_block, int_password, DES.DECRYPTION)
-                output_file_blocks.append(decrypted_block)
-                progress += 1
-                print(f'processing: {progress}/{len(file_blocks)}')
 
             # Вывод в файл
             f = open(values['-decode_into-'], 'wb')
