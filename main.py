@@ -16,10 +16,10 @@ layout = [[sg.Text('Шифрование Эль-Гамаля', font=("Helvetica"
           [sg.HorizontalSeparator()],
           [sg.Text('Шифрование файла', font=("Helvetica", 14))],
           [sg.Text('Файл:'), sg.FileBrowse(button_text='Выбрать файл', key='-encode_browse-')],
-          [sg.SaveAs('Зашифровать в', file_types=(("ALL Files", "*.des"),), change_submits=True, key='-encode_into-')],
+          [sg.SaveAs('Зашифровать в', file_types=(("ElGamal Files", "*.eg"),), change_submits=True, key='-encode_into-')],
           [sg.HorizontalSeparator()],
           [sg.Text('Дешифрование файла', font=("Helvetica", 14))],
-          [sg.Text('Файл:'), sg.FileBrowse(button_text='Выбрать файл', key='-decode_browse-')],
+          [sg.Text('Файл:'), sg.FileBrowse(button_text='Выбрать файл', file_types=(("ElGamal Files", "*.eg"),), key='-decode_browse-')],
           [sg.SaveAs('Расшифровать в', file_types=(("ALL Files", "*.* *"),), change_submits=True, key='-decode_into-')]]
 
 
